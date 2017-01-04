@@ -25,14 +25,11 @@ import com.cloudant.mazha.DocumentRevs;
 import com.cloudant.mazha.OkOpenRevision;
 import com.cloudant.mazha.OpenRevision;
 import com.cloudant.mazha.Response;
-import com.cloudant.sync.datastore.Attachment;
 import com.cloudant.sync.datastore.DocumentRevision;
 import com.cloudant.sync.datastore.DocumentRevsList;
 import com.cloudant.sync.datastore.MultipartAttachmentWriter;
-import com.cloudant.sync.datastore.UnsavedStreamAttachment;
 import com.cloudant.sync.util.Misc;
 
-import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -264,15 +261,6 @@ public class CouchClientWrapper implements CouchDB {
     @Override
     public Map<String, CouchClient.MissingRevisions> revsDiff(Map<String, Set<String>> revisions) {
         return this.couchClient.revsDiff(revisions);
-    }
-
-    @Override
-    public UnsavedStreamAttachment getAttachmentStream(String id, String rev, String attachmentName, String contentType, String encodingStr) {
-        // call with last arg `true` to indicate we will accept gzipped data
-        InputStream is = this.couchClient.getAttachmentStream(id, rev, attachmentName, true);
-        Attachment.Encoding encoding = Attachment.getEncodingFromString(encodingStr);
-        UnsavedStreamAttachment usa = new UnsavedStreamAttachment(is, attachmentName, contentType, encoding);
-        return usa;
     }
 
     @Override

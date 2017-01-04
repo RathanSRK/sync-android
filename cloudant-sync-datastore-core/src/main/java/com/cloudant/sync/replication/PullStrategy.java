@@ -14,7 +14,6 @@
 
 package com.cloudant.sync.replication;
 
-import com.cloudant.common.ValueListMap;
 import com.cloudant.http.HttpConnectionRequestInterceptor;
 import com.cloudant.http.HttpConnectionResponseInterceptor;
 import com.cloudant.mazha.ChangesResult;
@@ -27,7 +26,6 @@ import com.cloudant.sync.datastore.DatastoreImpl;
 import com.cloudant.sync.datastore.DocumentException;
 import com.cloudant.sync.datastore.DocumentRevsList;
 import com.cloudant.sync.datastore.PreparedAttachment;
-import com.cloudant.sync.datastore.UnsavedStreamAttachment;
 import com.cloudant.sync.event.EventBus;
 import com.cloudant.sync.util.CollectionUtils;
 import com.cloudant.sync.util.JSONUtils;
@@ -376,15 +374,15 @@ class PullStrategy implements ReplicationStrategy {
                                         }
 
                                     }
-                                    UnsavedStreamAttachment usa = this.sourceDb
-                                            .getAttachmentStream(documentRevs.getId(),
-                                                    documentRevs.getRev(), entry.getKey(),
-                                                    contentType, encoding);
 
                                     // by preparing the attachment here, it is downloaded outside
                                     // of the database transaction
-                                    preparedAtts.add(this.targetDb.prepareAttachment(usa, length,
-                                            encodedLength));
+                                    preparedAtts.add(AttachmentPullProcessor
+                                            .pulLAttachmentWithRetry(((CouchClientWrapper) this
+                                                    .sourceDb).getCouchClient(), this.targetDb,
+                                                    documentRevs.getId(), documentRevs.getRev(),
+                                                    entry.getKey(), contentType, encoding,
+                                                    length, encodedLength));
                                 }
                             }
                         } catch (Exception e) {
