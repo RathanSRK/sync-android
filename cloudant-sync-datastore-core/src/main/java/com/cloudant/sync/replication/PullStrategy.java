@@ -377,12 +377,11 @@ class PullStrategy implements ReplicationStrategy {
 
                                     // by preparing the attachment here, it is downloaded outside
                                     // of the database transaction
-                                    preparedAtts.add(AttachmentPullProcessor
-                                            .pulLAttachmentWithRetry(((CouchClientWrapper) this
-                                                    .sourceDb).getCouchClient(), this.targetDb,
-                                                    documentRevs.getId(), documentRevs.getRev(),
-                                                    entry.getKey(), contentType, encoding,
-                                                    length, encodedLength));
+                                    preparedAtts.add(this.sourceDb.pullAttachmentWithRetry
+                                            (documentRevs.getId(), documentRevs.getRev(), entry
+                                                    .getKey(), new AttachmentPullProcessor(this
+                                                    .targetDb, entry.getKey(), contentType,
+                                                    encoding, length, encodedLength)));
                                 }
                             }
                         } catch (Exception e) {

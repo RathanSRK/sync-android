@@ -59,4 +59,6 @@ interface CouchDB {
                                                    boolean pullAttachmentsInline);
     boolean isBulkSupported();
 
+    <T> T pullAttachmentWithRetry(String id, String rev, String name, CouchClient.InputStreamProcessor<T> streamProcessor);
+
 }

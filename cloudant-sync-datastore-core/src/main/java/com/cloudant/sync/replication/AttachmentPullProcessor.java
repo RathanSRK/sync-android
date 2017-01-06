@@ -28,13 +28,6 @@ public class AttachmentPullProcessor implements CouchClient
         this.encodedLength = encodedLength;
     }
 
-    static PreparedAttachment pulLAttachmentWithRetry(CouchClient client, DatastoreWrapper
-            wrapper, String id, String rev, String name, String contentType, String encoding,
-                                                      long length, long encodedLength) {
-        return client.processAttachmentStream(id, rev, name, true, new AttachmentPullProcessor
-                (wrapper, name, contentType, encoding, length, encodedLength));
-    }
-
     @Override
     public PreparedAttachment processStream(InputStream stream) throws AttachmentException {
         UnsavedStreamAttachment usa = new UnsavedStreamAttachment(stream, name, contentType,

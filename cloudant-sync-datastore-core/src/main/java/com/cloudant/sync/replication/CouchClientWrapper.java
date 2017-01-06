@@ -268,4 +268,10 @@ public class CouchClientWrapper implements CouchDB {
         return this.couchClient.isBulkSupported();
     }
 
+    @Override
+    public <T> T pullAttachmentWithRetry(String id, String rev, String name, CouchClient
+            .InputStreamProcessor<T> streamProcessor) {
+        return couchClient.processAttachmentStream(id, rev, name, true, streamProcessor);
+    }
+
 }
