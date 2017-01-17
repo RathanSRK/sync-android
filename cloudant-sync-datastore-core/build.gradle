@@ -12,6 +12,7 @@ dependencies {
     testCompile group: 'junit', name: 'junit', version:'4.11'
     testCompile group: 'org.mockito', name: 'mockito-all', version:'1.9.5'
     testCompile 'commons-validator:commons-validator:1.4.0'
+    testCompile group: 'eu.rekawek.toxiproxy', name: 'toxiproxy-java', version: '2.1.1'
 
     // will probably test on java se, but it doesn't hurt to have android in too
     testCompile project(':cloudant-sync-datastore-javase')

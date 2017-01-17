@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 IBM Corp. All rights reserved.
+ * Copyright © 2015, 2017 IBM Corp. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
  * except in compliance with the License. You may obtain a copy of the License at
@@ -14,48 +14,105 @@
 
 package com.cloudant.common;
 
-import com.cloudant.http.Http;
 import com.cloudant.sync.replication.ReplicationTestBase;
 
-import java.net.URL;
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+
+import eu.rekawek.toxiproxy.Proxy;
+import eu.rekawek.toxiproxy.ToxiproxyClient;
+import eu.rekawek.toxiproxy.model.Toxic;
+import eu.rekawek.toxiproxy.model.ToxicDirection;
+
+import java.util.UUID;
 
 /**
  * Created by tomblench on 23/07/15.
  */
 public class ProxyTestBase extends ReplicationTestBase {
 
-    // this is where toxiproxy listens
-    protected int proxyPort = Integer.parseInt(System.getProperty("test.couch.port", "8000"));
-    // this is the toxiproxy admin port
-    protected int proxyAdminPort = Integer.parseInt(System.getProperty("test.couch.proxy.admin.port",
+    // Proxy configuration
+    private final static String PROXY_HOST = System.getProperty("test.couch.proxy.host",
+            "localhost");
+    // this is the toxiproxy admin port for setting up proxies and toxics
+    private final static int PROXY_ADMIN_PORT = Integer.parseInt(System.getProperty("test.couch" +
+                    ".proxy.admin.port",
             "8474"));
+    // this is where the toxiproxy will listen (note uses test.couch.port so the tests will use the
+    // proxy not the real couch port).
+    private final static int PROXY_PORT = Integer.parseInt(System.getProperty("test.couch.port",
+            "8000"));
+
+    // Couch configuration
+    private final static String COUCH_HOST = System.getProperty("test.couch.host", "localhost");
     // this is where couchdb listens
-    protected int targetPort = Integer.parseInt(System.getProperty("test.couch.proxy.target.port",
+    private final static int COUCH_TARGET_PORT = Integer.parseInt(System.getProperty("test.couch" +
+                    ".proxy.target.port",
             "5984"));
-    protected String proxyName = "default";
-    protected String proxyHost = "127.0.0.1";
 
-    protected String jsonAddProxy = String.format("{\"name\": \"%s\", \"upstream\": \"localhost:%d\", \"listen\": \"localhost:%d\"}",
-            proxyName, targetPort, proxyPort);
+    // A toxiproxy client to administer the toxiproxy config
+    private static ToxiproxyClient toxicClient = new ToxiproxyClient(PROXY_HOST, PROXY_ADMIN_PORT);
 
+    // A toxiproxy instance for running unreliability tests
+    private static Proxy toxiProxy = null;
 
-    protected void startProxy() throws Exception {
-        // clear proxy
-        try {
-            Http.DELETE(new URL(String.format("http://%s:%d/proxies/%s", proxyHost,
-                    proxyAdminPort, proxyName))).execute().responseAsString();
-        } catch (Exception e) {
-            // 404?
+    /**
+     * Set up a proxy with a unique name for this test run, all requests will be routed through the
+     * proxy, but it will only be toxic after some toxics are added to it by the tests.
+     *
+     * @throws Exception
+     */
+    @BeforeClass
+    public static void addProxy() throws Exception {
+        // For now we proxy all tests in the same way
+        toxiProxy = toxicClient.createProxy(UUID.randomUUID().toString(), PROXY_HOST + ":" +
+                PROXY_PORT, COUCH_HOST + ":" + COUCH_TARGET_PORT);
+    }
+
+    /**
+     * Remove any added toxics after each test
+     *
+     * @throws Exception
+     */
+    @After
+    public void removeToxics() throws Exception {
+        for (Toxic t : toxiProxy.toxics().getAll()) {
+            t.remove();
         }
-        // set up fresh proxy
-        Http.POST(new URL(String.format("http://%s:%d/proxies", proxyHost, proxyAdminPort)), "application/json")
-                .setRequestBody(jsonAddProxy).execute().responseAsString();
     }
 
-    protected void stopProxy() throws Exception {
-        // clear proxy
-        Http.DELETE(new URL(String.format("http://%s:%d/proxies/%s", proxyHost, proxyAdminPort, proxyName)))
-                .execute().responseAsString();
+    /**
+     * Delete the proxy created by this test run
+     *
+     * @throws Exception
+     */
+    @AfterClass
+    public static void deleteProxy() throws Exception {
+        if (toxiProxy != null) {
+            toxiProxy.delete();
+        }
     }
 
+    /**
+     * Name for the default timeout toxic
+     */
+    private static final String TIMEOUT_NAME = "Timeout_50ms_0.5";
+
+    /**
+     * Add a default timeout toxic
+     *
+     * @throws Exception
+     */
+    protected void addTimeoutToxic() throws Exception {
+        toxiProxy.toxics().timeout(TIMEOUT_NAME, ToxicDirection.DOWNSTREAM, 50).setToxicity
+                (0.5f);
+    }
+
+    protected void removeTimeoutToxic() throws Exception {
+        Toxic t = toxiProxy.toxics().get(TIMEOUT_NAME);
+        if (t != null) {
+            t.remove();
+        }
+    }
 }
