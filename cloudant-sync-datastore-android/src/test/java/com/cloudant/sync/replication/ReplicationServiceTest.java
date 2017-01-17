@@ -35,6 +35,8 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.closeTo;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -47,7 +49,16 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
 
     private static final long ALARM_TOLERANCE_MS = 500;
     private static final int DEFAULT_WAIT_SECONDS = 5;
+    private static final int MILLIS_IN_SECOND = 1000;
+
+    /** An arbitrary number of replication intervals that's greater than one. */
+    private static final int ARBITRARY_NUMBER_OF_INTERVALS = 10;
+
+    /** An arbitrary number of replication intervals that's between zero and one. */
+    private static final float ARBITRARY_FRACTIONAL_INTERVAL = 0.5f;
+
     private static final String PREFERENCE_CLASS_NAME = "com.cloudant.android.TestReplicationService";
+
     private Context mMockContext;
     private SharedPreferences mMockPreferences;
     private SharedPreferences.Editor mMockPreferencesEditor;
@@ -106,8 +117,9 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
         service.onCreate();
         final CountDownLatch latch = new CountDownLatch(1);
 
-        long timeReturned = System.currentTimeMillis() - ((1000 * service.getUnboundIntervalInSeconds()) * 10);
-        when(mMockPreferences.getLong(PREFERENCE_CLASS_NAME + ".lastAlarmClock", 0)).thenReturn(timeReturned);
+        // An arbitrary time more than 1 replication interval in the past.
+        long moreThan1ReplicationPeriodInPast = System.currentTimeMillis() - intervalMillis(ARBITRARY_NUMBER_OF_INTERVALS, service);
+        when(mMockPreferences.getLong(PREFERENCE_CLASS_NAME + ".lastAlarmClock", 0)).thenReturn(moreThan1ReplicationPeriodInPast);
 
         service.setOperationStartedListener(new PeriodicReplicationService
             .OperationStartedListener() {
@@ -129,8 +141,8 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
             verify(mMockPreferencesEditor, times(2)).putLong(captorPrefKeys.capture(), captorPrefValues.capture());
             List<String> prefsKeys = captorPrefKeys.getAllValues();
             List<Long> prefsValues = captorPrefValues.getAllValues();
-            long expectedElapsedTime = SystemClock.elapsedRealtime() - (1000 * service.getUnboundIntervalInSeconds());
-            long expectedRealTime = System.currentTimeMillis() - (1000 * service.getUnboundIntervalInSeconds());
+            long expectedElapsedTime = SystemClock.elapsedRealtime() - intervalMillis(1, service);
+            long expectedRealTime = System.currentTimeMillis() - intervalMillis(1, service);
             checkElapsedPreferenceName(prefsKeys.get(0));
             checkElapsedTime(expectedElapsedTime, prefsValues.get(0));
             checkClockPreferenceName(prefsKeys.get(1));
@@ -155,8 +167,9 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
         service.onCreate();
         final CountDownLatch latch = new CountDownLatch(1);
 
-        long timeReturned = System.currentTimeMillis() - ((1000 * service.getUnboundIntervalInSeconds()) / 2);
-        when(mMockPreferences.getLong(PREFERENCE_CLASS_NAME + ".lastAlarmClock", 0)).thenReturn(timeReturned);
+        // An arbitrary time less than 1 replication interval in the past.
+        long between0and1ReplicationPeriodsInPast = System.currentTimeMillis() - intervalMillis(ARBITRARY_FRACTIONAL_INTERVAL, service);
+        when(mMockPreferences.getLong(PREFERENCE_CLASS_NAME + ".lastAlarmClock", 0)).thenReturn(between0and1ReplicationPeriodsInPast);
 
         service.setOperationStartedListener(new PeriodicReplicationService
             .OperationStartedListener() {
@@ -178,8 +191,8 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
             verify(mMockPreferencesEditor, times(2)).putLong(captorPrefKeys.capture(), captorPrefValues.capture());
             List<String> prefsKeys = captorPrefKeys.getAllValues();
             List<Long> prefsValues = captorPrefValues.getAllValues();
-            long expectedElapsedTime = SystemClock.elapsedRealtime() - (1000 * service.getUnboundIntervalInSeconds() / 2);
-            long expectedRealTime = System.currentTimeMillis() - (1000 * service.getUnboundIntervalInSeconds() / 2);
+            long expectedElapsedTime = SystemClock.elapsedRealtime() - intervalMillis(ARBITRARY_FRACTIONAL_INTERVAL, service);
+            long expectedRealTime = System.currentTimeMillis() - intervalMillis(ARBITRARY_FRACTIONAL_INTERVAL, service);
             checkElapsedPreferenceName(prefsKeys.get(0));
             checkElapsedTime(expectedElapsedTime, prefsValues.get(0));
             checkClockPreferenceName(prefsKeys.get(1));
@@ -202,8 +215,9 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
         service.onCreate();
         final CountDownLatch latch = new CountDownLatch(1);
 
-        long timeReturned = System.currentTimeMillis() + ((1000 * service.getUnboundIntervalInSeconds()) * 10);
-        when(mMockPreferences.getLong(PREFERENCE_CLASS_NAME + ".lastAlarmClock", 0)).thenReturn(timeReturned);
+        // An arbitrary time more than 1 replication interval in the future.
+        long moreThan1ReplicationPeriodInFuture = System.currentTimeMillis() + intervalMillis(ARBITRARY_NUMBER_OF_INTERVALS, service);
+        when(mMockPreferences.getLong(PREFERENCE_CLASS_NAME + ".lastAlarmClock", 0)).thenReturn(moreThan1ReplicationPeriodInFuture);
 
         service.setOperationStartedListener(new PeriodicReplicationService
             .OperationStartedListener() {
@@ -249,10 +263,11 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
         service.onCreate();
         final CountDownLatch latch = new CountDownLatch(1);
 
-        long timeReturned = SystemClock.elapsedRealtime() - (1000 * service.getUnboundIntervalInSeconds() / 2);
+        // An arbitrary time less than 1 replication interval in the past.
+        long between0and1ReplicationPeriodsInPast = SystemClock.elapsedRealtime() - intervalMillis(ARBITRARY_FRACTIONAL_INTERVAL, service);
         when(mMockPreferences.getBoolean(PREFERENCE_CLASS_NAME + ".periodicReplicationsActive", false)).thenReturn(false);
         when(mMockContext.getSystemService(Context.ALARM_SERVICE)).thenReturn(mMockAlarmManager);
-        when(mMockPreferences.getLong(PREFERENCE_CLASS_NAME + ".lastAlarmElapsed", 0)).thenReturn(timeReturned);
+        when(mMockPreferences.getLong(PREFERENCE_CLASS_NAME + ".lastAlarmElapsed", 0)).thenReturn(between0and1ReplicationPeriodsInPast);
 
         service.setOperationStartedListener(new PeriodicReplicationService
             .OperationStartedListener() {
@@ -283,9 +298,11 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
 
             verify(mMockAlarmManager, times(1)).setInexactRepeating(captorType.capture(), captorTriggerAtMillis.capture(), captorIntervalMillis.capture(), Mockito.any(PendingIntent.class));
             assertEquals("Incorrect alarm type", AlarmManager.ELAPSED_REALTIME_WAKEUP, (int) captorType.getValue());
-            long expectedInitialTriggerTime = timeReturned + (1000 * service.getUnboundIntervalInSeconds());
+            long expectedInitialTriggerTime = between0and1ReplicationPeriodsInPast + intervalMillis(1, service);
             assertEquals("Incorrect initial trigger time", expectedInitialTriggerTime, (long) captorTriggerAtMillis.getValue());
-            assertEquals("Incorrect alarm period", service.getUnboundIntervalInSeconds() * 1000, (long) captorIntervalMillis.getValue());
+            assertEquals("Incorrect alarm period", intervalMillis(1, service), (long)
+                captorIntervalMillis.getValue
+                ());
 
             // Unfortunately, we can't do much testing of the PendingIntent itself as there aren't
             // methods to extract anything useful.
@@ -695,14 +712,14 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
         }
     }
 
-    private void checkClockTime(long expectedTime, long actualTime) {
-        assertTrue("Last alarm elapsed time not within " + ALARM_TOLERANCE_MS + "ms of expected time",
-                Math.abs(expectedTime - actualTime) < ALARM_TOLERANCE_MS);
+    private void checkClockTime(double expectedTime, double actualTime) {
+        assertThat("Last alarm elapsed time not within " + ALARM_TOLERANCE_MS + "ms of expected time",
+            actualTime, closeTo(expectedTime, ALARM_TOLERANCE_MS));
     }
 
-    private void checkElapsedTime(long expectedTime, long actualTime) {
-        assertTrue("Last alarm clock time not within " + ALARM_TOLERANCE_MS + "ms of expected time",
-                Math.abs(expectedTime - actualTime) < ALARM_TOLERANCE_MS);
+    private void checkElapsedTime(double expectedTime, double actualTime) {
+        assertThat("Last alarm clock time not within " + ALARM_TOLERANCE_MS + "ms of expected time",
+            actualTime, closeTo(expectedTime, ALARM_TOLERANCE_MS));
     }
 
     private void checkClockPreferenceName(String actualName){
@@ -713,4 +730,16 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
         assertEquals(PREFERENCE_CLASS_NAME + ".lastAlarmElapsed", actualName);
     }
 
+    /**
+     * Multiplies {@code numberOfIntervals} by the number of milliseconds resulting from
+     * calling the given {@code service}'s {@code getUnboundIntervalInSeconds()} method, and
+     * returns the result.
+     * @param numberOfIntervals The number of intervals.
+     * @param service The service.
+     * @return The number of milliseconds in {@code numberOfIntervals} replication periods.
+     */
+    private static long intervalMillis(double numberOfIntervals, PeriodicReplicationService
+        service) {
+        return (long)(numberOfIntervals * service.getUnboundIntervalInSeconds() * MILLIS_IN_SECOND);
+    }
 }
