@@ -87,6 +87,9 @@ key is `ReplicationService.EXTRA_COMMAND`, and whose value is one of:
 * `ReplicationService.COMMAND_START_REPLICATION` This starts the replicators.
 * `ReplicationService.COMMAND_STOP_REPLICATION` This stops replicators in progress.
 * `PeriodicReplicationService.COMMAND_START_PERIODIC_REPLICATION` This starts the periodic replications when you are using the `PeriodicReplicationService`.
+The replications will occur immediately the first time this message is sent or if they were previously stopped explicitly by sending
+`PeriodicReplicationService.COMMAND_STOP_PERIODIC_REPLICATION`. However, if replications were previously stopped implicitly (e.g.
+by rebooting the device), then the existing replication schedule will be resumed.
 * `PeriodicReplicationService.COMMAND_STOP_PERIODIC_REPLICATION` This stops the periodic replications when you are using the `PeriodicReplicationService`.
 * `PeriodicReplicationService.COMMAND_DEVICE_REBOOTED` This resets the periodic replications after the device has rebooted when you are using the
 `PeriodicReplicationService`. This will be automatically called if your subclass of `PeriodicReplicationReceiver` calls through to the `onReceive()` method of `PeriodicReplicationReceiver`.

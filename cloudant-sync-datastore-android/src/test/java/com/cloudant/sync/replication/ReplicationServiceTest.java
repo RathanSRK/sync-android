@@ -242,9 +242,14 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
      * Check that when an intent is sent to the {@link PeriodicReplicationService} indicating that
      * periodic replications should be started, the {@link AlarmManager}, is setup to fire
      * at the correct time and with the correct frequency.
+     * @param afterExplicitStop If true, indicates that periodic replications were previously
+     *                          stopped explicitly, in which case the initial alarm is expected
+     *                          to be triggered immediately. If false, indicates that periodic
+     *                          replications were previously stopped implicitly (e.g. by rebooting
+     *                          the device), in which case the existing replication schedule
+     *                          should be maintained.
      */
-    @Test
-    public void testOnStartCommandStartPeriodicReplications() {
+    private void testOnStartCommandStartPeriodicReplications(boolean afterExplicitStop) {
         PeriodicReplicationService service = new TestReplicationService(mMockContext);
         Intent intent = new Intent(mMockContext, TestReplicationService.class);
         intent.putExtra(PeriodicReplicationService.EXTRA_COMMAND, PeriodicReplicationService.COMMAND_START_PERIODIC_REPLICATION);
@@ -255,6 +260,7 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
         when(mMockPreferences.getBoolean(PREFERENCE_CLASS_NAME + ".periodicReplicationsActive", false)).thenReturn(false);
         when(mMockContext.getSystemService(Context.ALARM_SERVICE)).thenReturn(mMockAlarmManager);
         when(mMockPreferences.getLong(PREFERENCE_CLASS_NAME + ".lastAlarmElapsed", 0)).thenReturn(timeReturned);
+        when(mMockPreferences.getBoolean(eq(PREFERENCE_CLASS_NAME + ".explicitlyStopped"), anyBoolean())).thenReturn(afterExplicitStop);
 
         service.setOperationStartedListener(new PeriodicReplicationService
             .OperationStartedListener() {
@@ -273,11 +279,19 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
             assertTrue("The countdown should reach zero", latch.await(DEFAULT_WAIT_SECONDS, TimeUnit.SECONDS));
             ArgumentCaptor<String> captorPrefKeys = ArgumentCaptor.forClass(String.class);
             ArgumentCaptor<Boolean> captorPrefValues = ArgumentCaptor.forClass(Boolean.class);
-            verify(mMockPreferencesEditor, times(1)).putBoolean(captorPrefKeys.capture(), captorPrefValues.capture());
-            String prefsKey = captorPrefKeys.getValue();
-            Boolean prefsValue = captorPrefValues.getValue();
-            assertEquals(PREFERENCE_CLASS_NAME + ".periodicReplicationsActive", prefsKey);
-            assertTrue("Alarm manager should be set in running state", prefsValue);
+            List<String> prefKeys = captorPrefKeys.getAllValues();
+            List<Boolean> prefValues = captorPrefValues.getAllValues();
+            verify(mMockPreferencesEditor, times(afterExplicitStop ? 2 : 1)).putBoolean
+                (captorPrefKeys.capture(),
+                captorPrefValues.capture());
+
+            assertEquals(PREFERENCE_CLASS_NAME + ".periodicReplicationsActive", prefKeys.get(0));
+            assertTrue("Alarm manager should be set in running state", prefValues.get(0));
+
+            if (afterExplicitStop) {
+                assertEquals(PREFERENCE_CLASS_NAME + ".explicitlyStopped", prefKeys.get(1));
+                assertFalse("Alarm manager should be set in running state", prefValues.get(1));
+            }
 
             ArgumentCaptor<Integer> captorType = ArgumentCaptor.forClass(Integer.class);
             ArgumentCaptor<Long> captorTriggerAtMillis = ArgumentCaptor.forClass(Long.class);
@@ -286,8 +300,15 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
             verify(mMockAlarmManager, times(1)).setInexactRepeating(captorType.capture(), captorTriggerAtMillis.capture(), captorIntervalMillis.capture(), Mockito.any(PendingIntent.class));
             assertEquals("Incorrect alarm type", AlarmManager.ELAPSED_REALTIME_WAKEUP, (int) captorType.getValue());
 
-            long expectedInitialTriggerTime = timeReturned + (1000 * service.getUnboundIntervalInSeconds());
-            assertEquals("Incorrect initial trigger time", expectedInitialTriggerTime, (long) captorTriggerAtMillis.getValue());
+            if (afterExplicitStop) {
+                long expectedInitialTriggerTime = SystemClock.elapsedRealtime();
+                assertTrue("Initial trigger time not within " + ALARM_TOLERANCE_MS + "ms of " +
+                        "expected time",
+                    Math.abs(expectedInitialTriggerTime - captorTriggerAtMillis.getValue()) < ALARM_TOLERANCE_MS);
+            } else {
+                long expectedInitialTriggerTime = timeReturned + (1000 * service.getUnboundIntervalInSeconds());
+                assertEquals("Incorrect initial trigger time", expectedInitialTriggerTime, (long) captorTriggerAtMillis.getValue());
+            }
             assertEquals("Incorrect alarm period", service.getUnboundIntervalInSeconds() * 1000, (long) captorIntervalMillis.getValue());
 
             // Unfortunately, we can't do much testing of the PendingIntent itself as there aren't
@@ -295,6 +316,27 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Check that when an intent is sent to the {@link PeriodicReplicationService} indicating that
+     * periodic replications should be started following an implicit stop (e.g. device reboot), the
+     * {@link AlarmManager} is setup to fire initially on the existing schedule and then with the
+     * correct frequency.
+     */
+    @Test
+    public void testOnStartCommandStartPeriodicReplicationsAfterImplicitStop() {
+        testOnStartCommandStartPeriodicReplications(false);
+    }
+
+    /**
+     * Check that when an intent is sent to the {@link PeriodicReplicationService} indicating that
+     * periodic replications should be started following an explicit stop, the
+     * {@link AlarmManager} is setup to fire immediately and then with the correct frequency.
+     */
+    @Test
+    public void testOnStartCommandStartPeriodicReplicationsAfterExplicitStop() {
+        testOnStartCommandStartPeriodicReplications(true);
     }
 
     /**
@@ -449,10 +491,13 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
             List<String> prefKeys = captorPrefKeys.getAllValues();
             List<Boolean> prefValues = captorPrefValues.getAllValues();
 
-            verify(mMockPreferencesEditor, times(1)).putBoolean(captorPrefKeys.capture(),
+            verify(mMockPreferencesEditor, times(2)).putBoolean(captorPrefKeys.capture(),
                 captorPrefValues.capture());
             assertEquals(PREFERENCE_CLASS_NAME + ".periodicReplicationsActive", prefKeys.get(0));
             assertFalse("Alarm manager should be set in stopped state", prefValues.get(0));
+            assertEquals(PREFERENCE_CLASS_NAME + ".explicitlyStopped", prefKeys.get(1));
+            assertTrue("Periodic replications should be set in explictly stopped state", prefValues
+                .get(1));
 
             verify(mMockAlarmManager, times(1)).cancel(Mockito.any(PendingIntent.class));
         } catch (InterruptedException e) {
