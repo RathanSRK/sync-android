@@ -88,7 +88,13 @@ key is `ReplicationService.EXTRA_COMMAND`, and whose value is one of:
 * `ReplicationService.COMMAND_STOP_REPLICATION` This stops replicators in progress.
 * `PeriodicReplicationService.COMMAND_START_PERIODIC_REPLICATION` This starts the periodic replications when you are using the `PeriodicReplicationService`.
 * `PeriodicReplicationService.COMMAND_STOP_PERIODIC_REPLICATION` This stops the periodic replications when you are using the `PeriodicReplicationService`.
-* `PeriodicReplicationService.COMMAND_DEVICE_REBOOTED` This resets the periodic replications aafter the device has rebooted when you are using the `PeriodicReplicationService`. This will be automatically called if your subclass of `PeriodicReplicationReceiver` calls through to the `onReceive()` method of `PeriodicReplicationReceiver`.
+* `PeriodicReplicationService.COMMAND_DEVICE_REBOOTED` This resets the periodic replications after the device has rebooted when you are using the
+`PeriodicReplicationService`. This will be automatically called if your subclass of `PeriodicReplicationReceiver` calls through to the `onReceive()` method of `PeriodicReplicationReceiver`.
+* `PeriodicReplicationService.COMMAND_RESET_REPLICATION_TIMERS` This re-evaluates the timers used by the `PeriodicReplicationService` by calling
+`getBoundIntervalInSeconds()` or `getUnboundIntervalInSeconds()`. This is useful if you allow the replication interval to be dynamically changed.
+For example, if you allow users to change the replication intervals in your app's settings (which should cause your implementations of
+`getBoundIntervalInSeconds()` and/or `getUnboundIntervalInSeconds()` to return a different result after a change), once the change has been made,
+you should send an `Intent` with this Extra so that the changes are applied to the `PeriodicReplicationService` immediately.
 
 For example, from a subclass of `PeriodicReplicationReceiver`, you might call:
 

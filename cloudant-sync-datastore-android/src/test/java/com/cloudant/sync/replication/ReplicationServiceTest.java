@@ -285,6 +285,7 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
 
             verify(mMockAlarmManager, times(1)).setInexactRepeating(captorType.capture(), captorTriggerAtMillis.capture(), captorIntervalMillis.capture(), Mockito.any(PendingIntent.class));
             assertEquals("Incorrect alarm type", AlarmManager.ELAPSED_REALTIME_WAKEUP, (int) captorType.getValue());
+
             long expectedInitialTriggerTime = timeReturned + (1000 * service.getUnboundIntervalInSeconds());
             assertEquals("Incorrect initial trigger time", expectedInitialTriggerTime, (long) captorTriggerAtMillis.getValue());
             assertEquals("Incorrect alarm period", service.getUnboundIntervalInSeconds() * 1000, (long) captorIntervalMillis.getValue());
@@ -331,6 +332,85 @@ public class ReplicationServiceTest extends ServiceTestCase<TestReplicationServi
             e.printStackTrace();
         }
     }
+
+    /**
+     * Check that when an intent is sent to the {@link PeriodicReplicationService} indicating that
+     * the replication timers have changed, the service is restarted with the new timer settings.
+     */
+    @Test
+    public void testOnStartCommandResetReplicationTimers() {
+        PeriodicReplicationService service = new TestReplicationService(mMockContext);
+        service.onCreate();
+        final CountDownLatch latch1 = new CountDownLatch(1);
+        final CountDownLatch latch2 = new CountDownLatch(1);
+
+        long timeReturned = SystemClock.elapsedRealtime() - 30000; // 30 seconds ago
+        when(mMockPreferences.getBoolean(PREFERENCE_CLASS_NAME + ".periodicReplicationsActive", false)).thenReturn(false);
+        when(mMockContext.getSystemService(Context.ALARM_SERVICE)).thenReturn(mMockAlarmManager);
+        when(mMockPreferences.getLong(PREFERENCE_CLASS_NAME + ".lastAlarmElapsed", 0)).thenReturn(timeReturned);
+
+        service.setOperationStartedListener(new PeriodicReplicationService
+                .OperationStartedListener() {
+            @Override
+            public void operationStarted(int operationId) {
+                if (operationId == PeriodicReplicationService.COMMAND_START_PERIODIC_REPLICATION
+                    && latch2.getCount() == 1) {
+                    latch1.countDown();
+                } else if (operationId == PeriodicReplicationService
+                    .COMMAND_RESET_REPLICATION_TIMERS && latch1.getCount() == 0) {
+                    latch2.countDown();
+                } else {
+                    fail("Unexpected command received");
+                }
+            }
+        });
+
+        final int unboundIntervalSeconds1 = 50;
+        ((TestReplicationService)service).setUnboundIntervalSeconds(unboundIntervalSeconds1);
+
+        Intent startIntent = new Intent(mMockContext, TestReplicationService.class);
+        startIntent.putExtra(PeriodicReplicationService.EXTRA_COMMAND, PeriodicReplicationService.COMMAND_START_PERIODIC_REPLICATION);
+        service.onStartCommand(startIntent, 0, 0);
+        service.setReplicators(mMockReplicators);
+
+        try {
+            assertTrue("The first countdown should reach zero", latch1.await(DEFAULT_WAIT_SECONDS,
+                TimeUnit.SECONDS));
+
+            final int unboundIntervalSeconds2 = 999;
+            ((TestReplicationService)service).setUnboundIntervalSeconds(unboundIntervalSeconds2);
+
+            Intent resetTimersIntent = new Intent(mMockContext, TestReplicationService.class);
+            resetTimersIntent.putExtra(PeriodicReplicationService.EXTRA_COMMAND, PeriodicReplicationService.COMMAND_RESET_REPLICATION_TIMERS);
+            service.onStartCommand(resetTimersIntent, 0, 0);
+
+            assertTrue("The countdown should reach zero", latch2.await(DEFAULT_WAIT_SECONDS,
+                TimeUnit.SECONDS));
+            ArgumentCaptor<Integer> captorType = ArgumentCaptor.forClass(Integer.class);
+            ArgumentCaptor<Long> captorTriggerAtMillis = ArgumentCaptor.forClass(Long.class);
+            ArgumentCaptor<Long> captorIntervalMillis = ArgumentCaptor.forClass(Long.class);
+            List<Integer> alarmTypes = captorType.getAllValues();
+            List<Long> triggerAtTimes = captorTriggerAtMillis.getAllValues();
+            List<Long> intervals = captorIntervalMillis.getAllValues();
+
+            verify(mMockAlarmManager, times(2)).setInexactRepeating(captorType.capture(), captorTriggerAtMillis.capture(), captorIntervalMillis.capture(), Mockito.any(PendingIntent.class));
+            assertEquals("Incorrect alarm type", AlarmManager.ELAPSED_REALTIME_WAKEUP, (int)alarmTypes.get(0));
+            long expectedInitialTriggerTime = timeReturned + (unboundIntervalSeconds1 * 1000);
+            assertEquals("Incorrect initial trigger time1", expectedInitialTriggerTime, (long)
+                triggerAtTimes.get(0));
+            assertEquals("Incorrect alarm period1", (unboundIntervalSeconds1 * 1000), (long) intervals.get(0));
+
+            assertEquals("Incorrect alarm type", AlarmManager.ELAPSED_REALTIME_WAKEUP, (int)alarmTypes.get(1));
+            expectedInitialTriggerTime = timeReturned + (unboundIntervalSeconds2 * 1000);
+            assertEquals("Incorrect initial trigger time2", expectedInitialTriggerTime, (long)
+                triggerAtTimes.get(1));
+            assertEquals("Incorrect alarm period2", (unboundIntervalSeconds2 * 1000), (long)
+                intervals.get(1));
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
 
     /**
      * Check that when an intent is sent to the {@link PeriodicReplicationService} indicating that

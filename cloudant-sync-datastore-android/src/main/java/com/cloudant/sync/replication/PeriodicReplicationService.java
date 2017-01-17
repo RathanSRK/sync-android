@@ -71,6 +71,7 @@ public abstract class PeriodicReplicationService<T extends PeriodicReplicationRe
     public static final int COMMAND_START_PERIODIC_REPLICATION = 2;
     public static final int COMMAND_STOP_PERIODIC_REPLICATION = 3;
     public static final int COMMAND_DEVICE_REBOOTED = 4;
+    public static final int COMMAND_RESET_REPLICATION_TIMERS = 5;
 
     private static final String TAG = "PRS";
 
@@ -128,6 +129,9 @@ public abstract class PeriodicReplicationService<T extends PeriodicReplicationRe
                     break;
                 case COMMAND_DEVICE_REBOOTED:
                     resetAlarmDueTimesOnReboot();
+                    break;
+                case COMMAND_RESET_REPLICATION_TIMERS:
+                    restartPeriodicReplications();
                     break;
                 default:
                     // Do nothing
