@@ -86,7 +86,10 @@ task unreliableNetworkTest(type: Test, dependsOn: testClasses) {
     systemProperty "test.with.specified.couch", true
     systemProperty "test.couch.port", 8000
     systemProperty "test.couch.proxy.admin.port", 8474
-    systemProperty "test.couch.proxy.target.port", 5984    
+    systemProperty "test.couch.proxy.target.port", 5984
+    // Disasble keep-alive for these tests otherwise we eventually fill the pool with good
+    // connections and the toxicity probabilities don't apply as we expect
+    systemProperty "http.keepAlive", false
     // ensure proxy is running!
     filter {        
         includeTestsMatching "com.cloudant.sync.replication.Unreliable*.*"
