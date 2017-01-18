@@ -30,7 +30,7 @@ import java.util.UUID;
 /**
  * Created by tomblench on 23/07/15.
  */
-public class ProxyTestBase extends ReplicationTestBase {
+public class UnreliableProxyTestBase extends ReplicationTestBase {
 
     // Proxy configuration
     private final static String PROXY_HOST = System.getProperty("test.couch.proxy.host",

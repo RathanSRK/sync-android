@@ -14,7 +14,7 @@
 
 package com.cloudant.sync.replication;
 
-import com.cloudant.common.ProxyTestBase;
+import com.cloudant.common.UnreliableProxyTestBase;
 import com.cloudant.common.RequireRunningProxy;
 import com.cloudant.sync.datastore.DocumentBodyFactory;
 import com.cloudant.sync.datastore.DocumentException;
@@ -33,7 +33,7 @@ import java.util.Map;
 
 
 @Category(RequireRunningProxy.class)
-public class UnreliableNetworkPushTest extends ProxyTestBase {
+public class UnreliableNetworkPushTest extends UnreliableProxyTestBase {
 
     @Test
     public void unreliableNetworkPushTest() throws Exception {

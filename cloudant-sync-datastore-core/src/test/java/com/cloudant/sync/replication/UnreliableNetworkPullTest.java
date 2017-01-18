@@ -14,7 +14,7 @@
 
 package com.cloudant.sync.replication;
 
-import com.cloudant.common.ProxyTestBase;
+import com.cloudant.common.UnreliableProxyTestBase;
 import com.cloudant.common.RequireRunningProxy;
 
 import org.junit.Assert;
@@ -29,7 +29,7 @@ import java.util.Map;
  */
 
 @Category(RequireRunningProxy.class)
-public class UnreliableNetworkPullTest extends ProxyTestBase {
+public class UnreliableNetworkPullTest extends UnreliableProxyTestBase {
 
     @Test
     public void unreliableNetworkPullTest() throws Exception {
